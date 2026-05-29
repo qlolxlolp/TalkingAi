@@ -10,6 +10,7 @@ import {customElement, state} from 'lit/decorators.js';
 import {createBlob, decode, decodeAudioData} from './utils';
 import {MemoryManager, UserProfile, MemoryItem, VoiceSignature} from './memory-manager';
 import './visual-3d';
+import LoadingScreen from './loading-screen';
 
 // Autocorrelation Pitch Detector
 function detectPitch(buffer: Float32Array, sampleRate: number): number {
@@ -62,6 +63,7 @@ export class GdmLiveAudio extends LitElement {
   @state() error = '';
   @state() autoStarted = false;
   @state() sessionInitialized = false;
+  @state() showLoading = true;
 
   // Persistent memory structures
   @state() activeUser: UserProfile;
@@ -663,6 +665,13 @@ export class GdmLiveAudio extends LitElement {
     setTimeout(() => this.startRecording(), 500);
   }
 
+  // Handle loading screen completion
+  private handleLoadingComplete = () => {
+    this.showLoading = false;
+    // Initialize client after loading screen
+    this.initClient();
+  }
+
   private getSystemInstruction(): string {
     const profile = this.activeUser;
     let desc = `تو "طناز" هستی، یک دختر ایرانی ۱۵ ساله، بسیار لوس، ناز، پرانرژی، احساساتی و کمی خودخواه اما مهربون.
@@ -1184,6 +1193,11 @@ export class GdmLiveAudio extends LitElement {
   }
 
   render() {
+    // Show loading screen first
+    if (this.showLoading) {
+      return html`<LoadingScreen .onComplete=${this.handleLoadingComplete} />`;
+    }
+
     return html`
       <div>
         <!-- Trigger Sidebar floating button -->
