@@ -61,6 +61,7 @@ export class GdmLiveAudio extends LitElement {
   @state() status = 'در حال راه‌اندازی سیستم صوتی... ⏳';
   @state() error = '';
   @state() autoStarted = false;
+  @state() sessionInitialized = false;
 
   // Persistent memory structures
   @state() activeUser: UserProfile;
@@ -96,6 +97,50 @@ export class GdmLiveAudio extends LitElement {
   private silenceCount = 0;
 
   static styles = css`
+    :host {
+      display: block;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      background: radial-gradient(ellipse at center, #1a0b14 0%, #0a0508 100%);
+      position: relative;
+    }
+
+    /* Cinematic vignette overlay */
+    :host::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 0%, rgba(0, 0, 0, 0.6) 100%);
+      z-index: 5;
+    }
+
+    /* Film grain texture overlay */
+    :host::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E");
+      opacity: 0.4;
+      z-index: 4;
+      animation: grainShift 0.5s steps(10) infinite;
+    }
+
+    @keyframes grainShift {
+      0%, 100% { transform: translate(0, 0); }
+      10% { transform: translate(-5%, -5%); }
+      20% { transform: translate(5%, 5%); }
+      30% { transform: translate(-5%, 5%); }
+      40% { transform: translate(5%, -5%); }
+      50% { transform: translate(-5%, 0); }
+      60% { transform: translate(5%, 0); }
+      70% { transform: translate(0, 5%); }
+      80% { transform: translate(0, -5%); }
+      90% { transform: translate(5%, 5%); }
+    }
+
     #status {
       position: absolute;
       bottom: 4vh;
@@ -120,16 +165,8 @@ export class GdmLiveAudio extends LitElement {
     }
 
     .controls {
-      z-index: 10;
-      position: absolute;
-      bottom: 12vh;
-      left: 0;
-      right: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-direction: row;
-      gap: 32px;
+      /* REMOVED: No longer needed as conversation is automatic */
+      display: none;
     }
 
     /* 3D Carbon Fiber Metallic Spherical button */
@@ -619,7 +656,11 @@ export class GdmLiveAudio extends LitElement {
 
     this.outputNode.connect(this.outputAudioContext.destination);
 
+    // Auto-start session immediately without user interaction
     this.initSession();
+    
+    // Request microphone access automatically on load
+    setTimeout(() => this.startRecording(), 500);
   }
 
   private getSystemInstruction(): string {
@@ -703,14 +744,7 @@ export class GdmLiveAudio extends LitElement {
           onopen: async () => {
             this.updateStatus(`امکان گفتگو صمیمی برقرار شد! با طناز صحبت کنید... ✅ (مخاطب فعال: ${this.activeUser.name})`);
             
-            // Auto-start conversation by sending initial text prompt to Gemini
-            if (!this.autoStarted && this.session) {
-              this.autoStarted = true;
-              // Send initial greeting to trigger AI to start talking first
-              await this.session.send({
-                text: 'سلام! من تازه وارد شدم. لطفاً خودت رو معرفی کن و یه سوال جالب ازم بپرس تا گپ بزنیم!'
-              });
-            }
+            // Auto-start conversation is now handled in startRecording after mic access
           },
           onmessage: async (message: LiveServerMessage) => {
             const audio =
@@ -1050,6 +1084,19 @@ export class GdmLiveAudio extends LitElement {
 
       this.isRecording = true;
       this.updateStatus('🔴 سیستم چت صوتی طناز فعال است، بگویید و بشنوید...');
+      
+      // Auto-trigger AI to start conversation immediately after recording starts
+      if (!this.autoStarted && this.session && !this.sessionInitialized) {
+        this.autoStarted = true;
+        this.sessionInitialized = true;
+        setTimeout(async () => {
+          if (this.session) {
+            await this.session.send({
+              text: 'سلام عزیزم! من طنازم، تازه اومدم پیشت. یه سوال جالب ازت بپرسم؟ امروزت چطور بوده؟'
+            });
+          }
+        }, 800);
+      }
     } catch (err: any) {
       console.error('Error starting recording:', err);
       this.updateStatus(`خطا: ${err.message}`);
@@ -1283,52 +1330,8 @@ export class GdmLiveAudio extends LitElement {
           </div>
         </div>
 
-        <!-- Sphere controls & layout -->
-        <div class="controls">
-          <button
-            id="resetButton"
-            title="تنظیم مجدد مکالمه"
-            @click=${this.reset}
-            ?disabled=${this.isRecording}>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              height="36px"
-              viewBox="0 -960 960 960"
-              width="36px"
-              fill="#ffffff">
-              <path
-                d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z" />
-            </svg>
-          </button>
-          <button
-            id="startButton"
-            title="شروع چت صوتی لوس (مکالمه دوطرفه بدون نوبت)"
-            @click=${this.startRecording}
-            ?disabled=${this.isRecording}>
-            <svg
-              viewBox="0 0 100 100"
-              width="34px"
-              height="34px"
-              fill="#ff453a"
-              xmlns="http://www.w3.org/2000/svg">
-              <circle cx="50" cy="50" r="48" stroke="#ffffff" stroke-width="4" />
-            </svg>
-          </button>
-          <button
-            id="stopButton"
-            title="پایان مکالمه صوتی"
-            @click=${this.stopRecording}
-            ?disabled=${!this.isRecording}>
-            <svg
-              viewBox="0 0 100 100"
-              width="28px"
-              height="28px"
-              fill="#ffffff"
-              xmlns="http://www.w3.org/2000/svg">
-              <rect x="15" y="15" width="70" height="70" rx="12" />
-            </svg>
-          </button>
-        </div>
+        <!-- Sphere controls & layout - REMOVED BUTTONS FOR AUTOMATIC CONVERSATION -->
+        <!-- Buttons removed: conversation now starts automatically on page load without user interaction -->
 
         <div id="status"> ${this.error ? html`<span style="color: #ff453a;">${this.error}</span>` : this.status} </div>
         <gdm-live-audio-visuals-3d
