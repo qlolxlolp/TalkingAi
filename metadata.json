@@ -1,0 +1,11 @@
+{
+  "name": "ریمیکس: گوی جادویی سخنگو",
+  "description": "با گوی جادویی هم‌صحبت شو! ارتباط صوتی هوشمند و زنده با طناز، دختر ۱۵ ساله شوخ و بانمک فارسی‌زبان.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "prompt": "",
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

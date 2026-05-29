@@ -1,0 +1,12 @@
+```
+# Build artifacts
+dist/
+*.html
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# Compressed files
+*.exr
+```
