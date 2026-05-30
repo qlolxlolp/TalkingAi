@@ -1,7 +1,6 @@
 ```
 # Build artifacts
 dist/
-*.html
 
 # Dependencies
 node_modules/
