@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>طناز | دستیار هوشمند صوتی</title>
+    <style>
+        :root {
+            --carbon-dark: #0a0a0a;
+            --carbon-light: #1a1a1a;
+            --metal-highlight: rgba(255, 255, 255, 0.6);
+            --metal-shadow: rgba(0, 0, 0, 0.8);
+            --neon-glow: rgba(100, 200, 255, 0.5);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Vazirmatn', Tahoma, sans-serif;
+            background-color: #000;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            perspective: 1000px;
+        }
+
+        /* Cinematic Background */
+        #canvas-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            filter: contrast(1.2) brightness(0.8);
+        }
+
+        .vignette {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, transparent 0%, #000 90%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* 3D Carbon Fiber Sphere Buttons */
+        .controls-container {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            gap: 2rem;
+            padding-bottom: 3rem;
+            z-index: 10;
+            width: 100%;
+            flex-wrap: nowrap;
+        }
+
+        .sphere-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform-style: preserve-3d;
+            box-shadow: 
+                inset 10px 10px 20px rgba(255, 255, 255, 0.1),
+                inset -10px -10px 20px rgba(0, 0, 0, 0.9),
+                0 15px 35px rgba(0, 0, 0, 0.8),
+                0 5px 15px rgba(0, 0, 0, 0.4);
+            background: 
+                radial-gradient(circle at 30% 30%, rgba(60, 60, 60, 0.8), transparent 20%),
+                repeating-linear-gradient(45deg, #111 0px, #111 2px, #0a0a0a 2px, #0a0a0a 4px),
+                linear-gradient(135deg, #2a2a2a 0%, #000 100%);
+            background-size: 100% 100%, 4px 4px, 100% 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: visible;
+        }
+
+        .sphere-btn::before {
+            content: '';
+            position: absolute;
+            top: 5%;
+            left: 10%;
+            width: 40%;
+            height: 20%;
+            border-radius: 50%;
+            background: radial-gradient(ellipse at center, rgba(255,255,255,0.4) 0%, transparent 70%);
+            filter: blur(2px);
+            z-index: 2;
+            opacity: 0.8;
+        }
+
+        .sphere-btn::after {
+            content: '';
+            position: absolute;
+            bottom: 10%;
+            right: 15%;
+            width: 30%;
+            height: 15%;
+            border-radius: 50%;
+            background: radial-gradient(ellipse at center, rgba(255,255,255,0.1) 0%, transparent 70%);
+            filter: blur(1px);
+            z-index: 2;
+        }
+
+        .sphere-btn:hover {
+            transform: scale(1.15) translateY(-5px);
+            box-shadow: 
+                inset 10px 10px 20px rgba(255, 255, 255, 0.2),
+                inset -10px -10px 20px rgba(0, 0, 0, 0.9),
+                0 25px 50px rgba(0, 0, 0, 0.9),
+                0 0 20px var(--neon-glow);
+        }
+
+        .sphere-btn:active {
+            transform: scale(0.95);
+        }
+
+        .sphere-icon {
+            font-size: 2rem;
+            color: #fff;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            z-index: 3;
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));
+            transition: transform 0.3s ease;
+        }
+
+        .sphere-btn:hover .sphere-icon {
+            transform: scale(1.2);
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255,255,255,0.8);
+        }
+
+        /* Specific Button Colors */
+        .btn-record {
+            border: 2px solid rgba(255, 50, 50, 0.3);
+        }
+        .btn-record .sphere-icon {
+            color: #ff4444;
+        }
+        
+        .btn-stop {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-reset {
+            border: 2px solid rgba(255, 165, 0, 0.3);
+        }
+        .btn-reset .sphere-icon {
+            color: #ffa500;
+        }
+
+        /* UI Overlay */
+        .ui-layer {
+            position: relative;
+            z-index: 5;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        .status-text {
+            font-size: 1.2rem;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            text-shadow: 0 0 10px rgba(0,0,0,0.8);
+            margin-bottom: 2rem;
+            backdrop-filter: blur(2px);
+            padding: 10px 20px;
+            border-radius: 20px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* Menu Toggle */
+        .menu-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(20, 20, 20, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 20;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            transition: all 0.3s ease;
+        }
+        .menu-toggle:hover {
+            transform: rotate(90deg);
+            background: rgba(40, 40, 40, 0.8);
+        }
+
+        /* Side Panel */
+        .side-panel {
+            position: fixed;
+            top: 0;
+            right: -350px;
+            width: 320px;
+            height: 100%;
+            background: rgba(10, 10, 10, 0.85);
+            backdrop-filter: blur(20px);
+            border-left: 1px solid rgba(255,255,255,0.1);
+            z-index: 15;
+            transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: -10px 0 30px rgba(0,0,0,0.8);
+        }
+        .side-panel.open {
+            right: 0;
+        }
+
+        .panel-header {
+            font-size: 1.5rem;
+            font-weight: 900;
+            margin-bottom: 20px;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255,255,255,0.3);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 10px;
+        }
+
+        .memory-item {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.9rem;
+            color: #ccc;
+        }
+
+        .switch-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            background: rgba(255,255,255,0.03);
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        /* Custom Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #333;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #00bcd4;
+            box-shadow: 0 0 10px #00bcd4;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        @media (max-width: 600px) {
+            .controls-container {
+                gap: 1.5rem;
+                padding-bottom: 2rem;
+            }
+            .sphere-btn {
+                width: 65px;
+                height: 65px;
+            }
+            .sphere-icon {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas-bg"></canvas>
+    <div class="vignette"></div>
+
+    <div class="menu-toggle" onclick="toggleMenu()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+    </div>
+
+    <div class="side-panel" id="sidePanel">
+        <div class="panel-header">تنظیمات و حافظه</div>
+        
+        <div class="switch-container">
+            <span style="font-size: 0.9rem;">🔒 نمایش پرونده‌های محرمانه</span>
+            <label class="switch">
+                <input type="checkbox" id="privacyToggle" onchange="togglePrivacy()">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="switch-container">
+            <span style="font-size: 0.9rem;">🎙️ ثبت اثر صدا (خودکار)</span>
+            <label class="switch">
+                <input type="checkbox" id="voicePrintToggle" checked disabled>
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div id="memoryContent" style="display: none; margin-top: 20px;">
+            <h3 style="color: #00bcd4; margin-bottom: 10px;">حافظه طناز</h3>
+            <div id="memoryList"></div>
+            <button onclick="clearMemory()" style="width: 100%; padding: 10px; background: #ff4444; border: none; color: white; border-radius: 5px; margin-top: 20px; cursor: pointer;">پاکسازی کل حافظه</button>
+        </div>
+        
+        <div id="lockedMessage" style="text-align: center; color: #666; margin-top: 50px;">
+            🔒 برای مشاهده خاطرات، قفل را باز کنید.
+        </div>
+    </div>
+
+    <div class="ui-layer">
+        <div class="status-text" id="statusText">برای شروع گفتگو دکمه قرمز را لمس کن...</div>
+    </div>
+
+    <div class="controls-container">
+        <button class="sphere-btn btn-reset" onclick="resetConversation()" title="بازنشانی گفتگو">
+            <span class="sphere-icon">↻</span>
+        </button>
+        
+        <button class="sphere-btn btn-record" id="recordBtn" onclick="toggleRecording()" title="شروع/توقف ضبط">
+            <span class="sphere-icon">●</span>
+        </button>
+        
+        <button class="sphere-btn btn-stop" onclick="stopAll()" title="قطع کامل">
+            <span class="sphere-icon">■</span>
+        </button>
+    </div>
+
+    <script>
+        // --- VISUAL FX ENGINE (High Performance Canvas) ---
+        const canvas = document.getElementById('canvas-bg');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let particles = [];
+        
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+            reset() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.z = Math.random() * 2 + 0.5;
+                this.size = Math.random() * 2;
+                this.speedX = (Math.random() - 0.5) * 0.5;
+                this.speedY = (Math.random() - 0.5) * 0.5;
+                this.opacity = Math.random() * 0.5 + 0.1;
+                this.hue = Math.random() * 60 + 200;
+            }
+            update() {
+                this.x += this.speedX * this.z;
+                this.y += this.speedY * this.z;
+                if (this.x > width) this.x = 0;
+                if (this.x < 0) this.x = width;
+                if (this.y > height) this.y = 0;
+                if (this.y < 0) this.y = height;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * this.z, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${this.hue}, 80%, 60%, ${this.opacity})`;
+                ctx.shadowBlur = 10 * this.z;
+                ctx.shadowColor = `hsla(${this.hue}, 80%, 60%, 0.8)`;
+                ctx.fill();
+            }
+        }
+
+        for (let i = 0; i < 150; i++) particles.push(new Particle());
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            ctx.strokeStyle = 'rgba(100, 200, 255, 0.05)';
+            ctx.lineWidth = 0.5;
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+                for (let j = i + 1; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < 100) {
+                        ctx.beginPath();
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        // --- APP LOGIC ---
+        window.toggleMenu = () => {
+            document.getElementById('sidePanel').classList.toggle('open');
+        };
+
+        window.togglePrivacy = () => {
+            const isLocked = !document.getElementById('privacyToggle').checked;
+            document.getElementById('memoryContent').style.display = isLocked ? 'none' : 'block';
+            document.getElementById('lockedMessage').style.display = isLocked ? 'block' : 'none';
+            if (!isLocked) loadMemories();
+        };
+
+        window.clearMemory = () => {
+            if(confirm('آیا مطمئن هستید؟ تمام خاطرات پاک خواهد شد.')) {
+                localStorage.removeItem('tonaz_memories');
+                localStorage.removeItem('tonaz_users');
+                alert('حافظه بازنشانی شد.');
+                location.reload();
+            }
+        };
+
+        function loadMemories() {
+            const list = document.getElementById('memoryList');
+            list.innerHTML = '';
+            const memories = JSON.parse(localStorage.getItem('tonaz_memories') || '[]');
+            if (memories.length === 0) {
+                list.innerHTML = '<div style="color:#666; text-align:center;">هنوز خاطره‌ای ثبت نشده.</div>';
+                return;
+            }
+            memories.slice().reverse().forEach(m => {
+                const div = document.createElement('div');
+                div.className = 'memory-item';
+                div.innerText = m.text;
+                list.appendChild(div);
+            });
+        }
+
+        // State
+        let isRecording = false;
+        const statusText = document.getElementById('statusText');
+        const recordBtn = document.getElementById('recordBtn');
+
+        async function startSession() {
+            statusText.innerText = "در حال اتصال به طناز...";
+            
+            try {
+                // Simulating connection
+                setTimeout(() => {
+                    statusText.innerText = "متصل شد! صحبت کن عزیزم...";
+                    isRecording = true;
+                    updateButtonState();
+                }, 1500);
+            } catch (error) {
+                console.error(error);
+                statusText.innerText = "خطا در اتصال. لطفاً دوباره تلاش کن.";
+            }
+        }
+
+        function stopSession() {
+            isRecording = false;
+            updateButtonState();
+            statusText.innerText = "قطع شد.";
+        }
+
+        window.toggleRecording = () => {
+            if (isRecording) {
+                stopSession();
+            } else {
+                startSession();
+            }
+        };
+
+        window.stopAll = () => {
+            stopSession();
+            statusText.innerText = "توقف کامل.";
+        };
+
+        window.resetConversation = () => {
+            if(confirm("می‌خوای همه چی رو فراموش کنم و از اول شروع کنیم؟")) {
+                localStorage.clear();
+                location.reload();
+            }
+        };
+
+        function updateButtonState() {
+            const icon = recordBtn.querySelector('.sphere-icon');
+            if (isRecording) {
+                icon.innerText = "●";
+                recordBtn.style.boxShadow = "0 0 30px rgba(255, 50, 50, 0.6)";
+            } else {
+                icon.innerText = "▶";
+                recordBtn.style.boxShadow = "";
+            }
+        }
+    </script>
+</body>
+</html>
