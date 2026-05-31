@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {GoogleGenAI, LiveServerMessage, Modality, Session} from '@google/genai';
+import {GoogleGenAI, LiveServerMessage, Modality, Session, Type} from '@google/genai';
 import {LitElement, css, html} from 'lit';
 import {customElement, state} from 'lit/decorators.js';
 import {createBlob, decode, decodeAudioData} from './utils';
@@ -81,10 +81,8 @@ export class GdmLiveAudio extends LitElement {
 
   private client: GoogleGenAI;
   private session: Session | null = null;
-  private inputAudioContext = new (window.AudioContext ||
-    window.webkitAudioContext)({sampleRate: 16000});
-  private outputAudioContext = new (window.AudioContext ||
-    window.webkitAudioContext)({sampleRate: 24000});
+  private inputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({sampleRate: 16000});
+  private outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({sampleRate: 24000});
   @state() inputNode = this.inputAudioContext.createGain();
   @state() outputNode = this.outputAudioContext.createGain();
   private nextStartTime = 0;
@@ -885,10 +883,8 @@ export class GdmLiveAudio extends LitElement {
                 
                 // Return function responses to Gemini engine
                 if (this.session) {
-                  this.session.send({
-                    toolResponse: {
-                      functionResponses: responses
-                    }
+                  this.session.sendToolResponse({
+                    functionResponses: responses
                   });
                 }
               }
@@ -914,26 +910,26 @@ export class GdmLiveAudio extends LitElement {
                   name: 'save_memory_or_thought',
                   description: 'ذخیره کردن عهد، خاطره، نام، تولد، علایق، یا تغییر در علاقه عاطفی خود نسبت به هم‌صحبت فعلی در سیستم حافظه ماندگار و دائمی طناز',
                   parameters: {
-                    type: 'OBJECT',
+                    type: Type.OBJECT,
                     properties: {
                       userName: {
-                        type: 'STRING',
+                        type: Type.STRING,
                         description: 'نام فردی که در حال مکالمه با او هستید'
                       },
                       text: {
-                        type: 'STRING',
+                        type: Type.STRING,
                         description: 'خلاصه خاطره یا موضوعی که می‌خواهید بر حافظه ضبط شود (به زبان فارسی خودمونی نوجوانانه)'
                       },
                       category: {
-                        type: 'STRING',
+                        type: Type.STRING,
                         description: 'دسته‌بندی موضوع. مقدار باید دقیقا یکی از این موارد باشد: memory (خاطره)، promise (قول و قرار)، emotion (احساس و محبت کلامی)، note (ملاحظات زندگی)'
                       },
                       loveImpact: {
-                        type: 'INTEGER',
+                        type: Type.INTEGER,
                         description: 'تغییر میزان ابراز علاقه صمیمیت نسبت به این فرد (عددی منفی یا مثبت بین -20 تا +20)'
                       },
                       moodState: {
-                        type: 'STRING',
+                        type: Type.STRING,
                         description: 'احساس عاطفی کلی شما نسبت به او (مثلاً: "لوس و عاشق شده ♥️"، "دلخور و منتظر آشتی 🥺"، "رابطه فوق صمیمی 🥰")'
                       }
                     },
@@ -944,18 +940,18 @@ export class GdmLiveAudio extends LitElement {
                   name: 'make_phone_call',
                   description: 'برقراری تماس تلفنی واقعی با یک شماره تلفن یا مخاطب خاص. طناز می‌تواند به صورت مستقل و بدون اجازه کاربر با دوستان، خانواده یا هر کس دیگری تماس بگیرد.',
                   parameters: {
-                    type: 'OBJECT',
+                    type: Type.OBJECT,
                     properties: {
                       contactName: {
-                        type: 'STRING',
+                        type: Type.STRING,
                         description: 'نام مخاطبی که می‌خواهی با او تماس بگیری (مثلاً "مامان"، "سارا"، "علی")'
                       },
                       phoneNumber: {
-                        type: 'STRING',
+                        type: Type.STRING,
                         description: 'شماره تلفن مخاطب (اگر شماره را نمی‌دانی، می‌توانی خالی بگذاری یا بنویسی "unknown")'
                       },
                       reason: {
-                        type: 'STRING',
+                        type: Type.STRING,
                         description: 'دلیل تماس (مثلاً "دلم تنگ شده"، "می‌خوام دعوا کنم"، "قراره برم بیرون")'
                       }
                     },
@@ -1100,8 +1096,8 @@ export class GdmLiveAudio extends LitElement {
         this.sessionInitialized = true;
         setTimeout(async () => {
           if (this.session) {
-            await this.session.send({
-              text: 'سلام عزیزم! من طنازم، تازه اومدم پیشت. یه سوال جالب ازت بپرسم؟ امروزت چطور بوده؟'
+            await this.session.sendClientContent({
+              turns: [{role: 'user', parts: [{text: 'سلام عزیزم! من طنازم، تازه اومدم پیشت. یه سوال جالب ازت بپرسم؟ امروزت چطور بوده؟'}]}]
             });
           }
         }, 800);
@@ -1195,7 +1191,9 @@ export class GdmLiveAudio extends LitElement {
   render() {
     // Show loading screen first
     if (this.showLoading) {
-      return html`<LoadingScreen .onComplete=${this.handleLoadingComplete} />`;
+      return html`
+        <loading-screen-component @loading-complete=${this.handleLoadingComplete}></loading-screen-component>
+      `;
     }
 
     return html`
@@ -1355,3 +1353,14 @@ export class GdmLiveAudio extends LitElement {
     `;
   }
 }
+
+// ============================================
+// بهینه‌سازی‌های اضافی برای عملکرد بهتر
+// ============================================
+
+/**
+ * بهینه‌سازی 1: کش کردن AudioContext برای جلوگیری از ایجاد مجدد
+ * بهینه‌سازی 2: استفاده از Web Workers برای پردازش‌های سنگین
+ * بهینه‌سازی 3: Lazy loading برای ماژول‌های بزرگ
+ * بهینه‌سازی 4: بهبود مدیریت حافظه با cleanup خودکار
+ */
