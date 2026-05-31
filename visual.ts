@@ -101,14 +101,16 @@ export class GdmLiveAudioVisuals extends LitElement {
     requestAnimationFrame(() => this.visualize());
   }
 
-  private firstUpdated() {
+  protected firstUpdated() {
     this.canvas = this.shadowRoot!.querySelector('canvas');
-    this.canvas.width = 400;
-    this.canvas.height = 400;
-    this.canvasCtx = this.canvas.getContext('2d');
+    if (this.canvas) {
+      this.canvas.width = 400;
+      this.canvas.height = 400;
+      this.canvasCtx = this.canvas.getContext('2d')!;
+    }
   }
 
-  private render() {
+  protected render() {
     return html`<canvas></canvas>`;
   }
 }
