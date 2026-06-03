@@ -1,49 +1,13 @@
 ```
-# Compiled Python files
-*.pyc
-__pycache__/
-
-# Virtual environments
-.venv/
-venv/
-env/
-
-# Logs
+# Logs and temp files
 *.log
-
-# Temporary files
 *.tmp
-*.swp
 
-# Environment files
-.env
-.env.local
-*.env.*
+# Database
+ilam_electric_db.sqlite
 
-# Coverage reports
-.coverage
-coverage/
-htmlcov/
-
-# IDE specific
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS generated files
-.DS_Store
-Thumbs.db
-
-# Build outputs
-dist/
+# Build artifacts
+*.spec
 build/
-target/
-*.out
-
-# Dependencies cache
-.node_modules/
-.mypy_cache/
-.pytest_cache/
-.gradle/
+dist/
 ```
