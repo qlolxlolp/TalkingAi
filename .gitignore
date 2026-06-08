@@ -1,63 +1,13 @@
 ```
-# Build artifacts
-dist/
-build/
-*.js
-*.ts
-*.tsx
-*.jsx
-*.css
-*.html
-*.json
-*.webmanifest
-*.md
-
-# Dependencies
-node_modules/
-
-# Package lock files
-package-lock.json
-
 # Logs and temp files
 *.log
 *.tmp
-*.swp
 
-# Environment
-.env
-.env.local
-.env.
+# Database
+ilam_electric_db.sqlite
 
-# Editors
-.vscode/
-.idea/
-
-# Coverage reports
-coverage/
-htmlcov/
-.coverage
-
-# Distribution / Packaging
-*.tar
-*.zip
-*.gz
-*.tgz
-*.bz2
-*.xz
-*.7z
-*.rar
-*.zst
-*.lz4
-*.lzh
-*.cab
-*.arj
-*.rpm
-*.deb
-*.Z
-*.lz
-*.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
+# Build artifacts
+*.spec
+build/
+dist/
 ```
