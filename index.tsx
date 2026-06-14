@@ -9,8 +9,9 @@ import {LitElement, css, html} from 'lit';
 import {customElement, state} from 'lit/decorators.js';
 import {createBlob, decode, decodeAudioData} from './utils';
 import {MemoryManager, UserProfile, MemoryItem, VoiceSignature} from './memory-manager';
+import {qwenVoice} from './qwen-voice';
 import './visual-3d';
-import LoadingScreen from './loading-screen';
+import './loading-screen';
 
 // Autocorrelation Pitch Detector
 function detectPitch(buffer: Float32Array, sampleRate: number): number {
@@ -634,6 +635,42 @@ export class GdmLiveAudio extends LitElement {
       from { opacity: 0; transform: translateY(-5px); }
       to { opacity: 1; transform: translateY(0); }
     }
+
+    /* Avatar Display */
+    .avatar-container {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      z-index: 15;
+      pointer-events: none;
+    }
+
+    .avatar-image {
+      max-height: 70vh;
+      max-width: 40vw;
+      object-fit: contain;
+      filter: drop-shadow(0 10px 40px rgba(0, 0, 0, 0.7));
+      animation: floatAvatar 3s ease-in-out infinite;
+    }
+
+    @keyframes floatAvatar {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-20px); }
+    }
+
+    .avatar-label {
+      font-size: 28px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.9);
+      text-shadow: 0 4px 12px rgba(0, 0, 0, 0.8);
+      font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+      letter-spacing: 2px;
+    }
   `;
 
   constructor() {
@@ -651,6 +688,14 @@ export class GdmLiveAudio extends LitElement {
 
   private async initClient() {
     this.initAudio();
+
+    // Initialize Qwen voice provider
+    try {
+      await qwenVoice.initialize();
+      console.log('[v0] Qwen voice provider initialized');
+    } catch (error) {
+      console.error('[v0] Qwen voice initialization failed:', error);
+    }
 
     this.client = new GoogleGenAI({
       apiKey: process.env.GEMINI_API_KEY,
@@ -1195,7 +1240,7 @@ export class GdmLiveAudio extends LitElement {
   render() {
     // Show loading screen first
     if (this.showLoading) {
-      return html`<LoadingScreen .onComplete=${this.handleLoadingComplete} />`;
+      return html`<loading-screen @loading-complete=${this.handleLoadingComplete}></loading-screen>`;
     }
 
     return html`
@@ -1348,6 +1393,17 @@ export class GdmLiveAudio extends LitElement {
         <!-- Buttons removed: conversation now starts automatically on page load without user interaction -->
 
         <div id="status"> ${this.error ? html`<span style="color: #ff453a;">${this.error}</span>` : this.status} </div>
+        
+        <!-- Avatar Display -->
+        <div class="avatar-container">
+          <img 
+            src="/avatar.png" 
+            alt="طناز - دستیار صوتی هوشمند"
+            class="avatar-image"
+          />
+          <div class="avatar-label">طناز</div>
+        </div>
+        
         <gdm-live-audio-visuals-3d
           .inputNode=${this.inputNode}
           .outputNode=${this.outputNode}></gdm-live-audio-visuals-3d>
