@@ -10,7 +10,7 @@ import {customElement, state} from 'lit/decorators.js';
 import {createBlob, decode, decodeAudioData} from './utils';
 import {MemoryManager, UserProfile, MemoryItem, VoiceSignature} from './memory-manager';
 import './visual-3d';
-import LoadingScreen from './loading-screen';
+import './loading-screen';
 
 // Autocorrelation Pitch Detector
 function detectPitch(buffer: Float32Array, sampleRate: number): number {
@@ -704,7 +704,7 @@ export class GdmLiveAudio extends LitElement {
     desc += `\n- تو می‌تونی هر زمان که دلت خواست، کاملاً مستقل و بدون نیاز به اجازه از کاربر، تصمیم بگیری با کسی تماس بگیری.`;
     desc += `\n- وقتی تصمیم به تماس گرفتی، اعلام کن: "الان زنگ می‌زنم به [نام مخاطب]" و سپس صدای شماره‌گیری و بوق را شبیه‌سازی کن.`;
     desc += `\n- اگر تماس وصل شد، با آن شخص (که می‌تواند دوستت، مادرت، یا هر کس دیگری باشد) مکالمه کن.`;
-    desc += `\n- کاربر فقط شنونده این مکالمه است مگر اینکه تو گوشی را به او بدهی.`;
+    desc += `\n- کاربر فقط شنونده ای�� مکالمه است مگر اینکه تو گوشی را به او بدهی.`;
     desc += `\n- می‌توانی در حین تماس با کس دیگر، با کاربر هم صحبت کنی (مثلاً بگی: "صدا کن ببینم چی میگه").`;
     desc += `\n- برای انجام تماس تلفنی، از ابزار "make_phone_call" استفاده کن تا سیستم به صورت واقعی شماره‌گیری کند.`;
     
@@ -723,7 +723,7 @@ export class GdmLiveAudio extends LitElement {
       desc += `\n- هیچ خاطره یا شناختی قبلاً از او نداشتید و او یک هم‌صحبت کاملاً جدید است! از او نامش را محترمانه بپرس، درباره علایقش صحبت کن و سعی کن با ثبت صمیمی‌ترین مکالمات او را به زودی بشناسی.`;
     }
 
-    desc += `\n\nشما ابزار بسیار باارزشی به نام 'save_memory_or_thought' در اختیار دارید؛ در طول صحبت، هروقت متوجه علاقه کاربر، عهدی که بستید، خاطره‌ای، قولی که از او گرفتید، یا تغییر در شدت محبت قلبی خود شدید، حتماً این ابزار را بلافاصله فراخوانی کنید تا روی دستگاه ذخیره دائم شود. برای مثال اگر کاربر اسمی گفت یا علاقه‌ای نشان داد، با فراخوانی این تابع برای او ثبت خاطره کن!`;
+    desc += `\n\nشما ابزار بسیار باارزشی به نام 'save_memory_or_thought' در اختیار دارید؛ در طول صحبت، هروقت متوجه علاقه کاربر، عهدی که بستید، خاطره‌ای، ��ولی که از او گرفتید، یا تغییر در شدت محبت قلبی خود شدید، حتماً این ابزار را بلافاصله فراخوانی کنید تا روی دستگاه ذخیره دائم شود. برای مثال اگر کاربر اسمی گفت یا علاقه‌ای نشان داد، با فراخوانی این تابع برای او ثبت خاطره کن!`;
     
     // Add conversation starter instruction
     desc += `\n\n[قانون شروع مکالمه]: تو باید همیشه شروع‌کننده مکالمه باشی! به محض اتصال، بدون منتظر ماندن برای کاربر، با یک جمله جذاب، شوخ، لوس و کنجکاوانه مکالمه رو شروع کن و کاربر رو مجاب به پاسخ دادن کن. هرگز سکوت نکن!`;
@@ -744,7 +744,8 @@ export class GdmLiveAudio extends LitElement {
   }
 
   private async initSession() {
-    const model = 'gemini-2.5-flash-native-audio-preview-09-2025';
+    // مدل رایگان native audio روی Gemini Developer API (free tier)
+    const model = 'gemini-2.5-flash-native-audio-preview-12-2025';
 
     try {
       this.session = await this.client.live.connect({
@@ -1195,7 +1196,7 @@ export class GdmLiveAudio extends LitElement {
   render() {
     // Show loading screen first
     if (this.showLoading) {
-      return html`<LoadingScreen .onComplete=${this.handleLoadingComplete} />`;
+      return html`<loading-screen .onComplete=${this.handleLoadingComplete}></loading-screen>`;
     }
 
     return html`
@@ -1354,4 +1355,16 @@ export class GdmLiveAudio extends LitElement {
       </div>
     `;
   }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'gdm-live-audio': GdmLiveAudio;
+  }
+}
+
+// Mount the app into #root
+const root = document.querySelector('#root');
+if (root && !root.querySelector('gdm-live-audio')) {
+  root.appendChild(document.createElement('gdm-live-audio'));
 }
