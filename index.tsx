@@ -704,7 +704,7 @@ export class GdmLiveAudio extends LitElement {
     desc += `\n- تو می‌تونی هر زمان که دلت خواست، کاملاً مستقل و بدون نیاز به اجازه از کاربر، تصمیم بگیری با کسی تماس بگیری.`;
     desc += `\n- وقتی تصمیم به تماس گرفتی، اعلام کن: "الان زنگ می‌زنم به [نام مخاطب]" و سپس صدای شماره‌گیری و بوق را شبیه‌سازی کن.`;
     desc += `\n- اگر تماس وصل شد، با آن شخص (که می‌تواند دوستت، مادرت، یا هر کس دیگری باشد) مکالمه کن.`;
-    desc += `\n- کاربر فقط شنونده این مکالمه است مگر اینکه تو گوشی را به او بدهی.`;
+    desc += `\n- کاربر فقط شنونده ای�� مکالمه است مگر اینکه تو گوشی را به او بدهی.`;
     desc += `\n- می‌توانی در حین تماس با کس دیگر، با کاربر هم صحبت کنی (مثلاً بگی: "صدا کن ببینم چی میگه").`;
     desc += `\n- برای انجام تماس تلفنی، از ابزار "make_phone_call" استفاده کن تا سیستم به صورت واقعی شماره‌گیری کند.`;
     
@@ -744,7 +744,8 @@ export class GdmLiveAudio extends LitElement {
   }
 
   private async initSession() {
-    const model = 'gemini-2.5-flash-native-audio-preview-09-2025';
+    // مدل رایگان native audio روی Gemini Developer API (free tier)
+    const model = 'gemini-2.5-flash-native-audio-preview-12-2025';
 
     try {
       this.session = await this.client.live.connect({
