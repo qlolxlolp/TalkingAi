@@ -9,6 +9,7 @@ import {LitElement, css, html} from 'lit';
 import {customElement, state} from 'lit/decorators.js';
 import {createBlob, decode, decodeAudioData} from './utils';
 import {MemoryManager, UserProfile, MemoryItem, VoiceSignature} from './memory-manager';
+import {IlamPowerDB, IlamCustomer, CallResult} from './ilam-power-db';
 import './visual-3d';
 import './loading-screen';
 
@@ -76,8 +77,17 @@ export class GdmLiveAudio extends LitElement {
   @state() isTrainingSignature = false;
   @state() audioWarning = '';
 
+  // Environment mode: personal | power_operator | coding | settings
+  @state() currentEnvironment: 'personal' | 'power_operator' | 'coding' | 'settings' = 'personal';
+  @state() ilamCustomers: IlamCustomer[] = [];
+  @state() activeCampaignCustomer: IlamCustomer | null = null;
+  @state() campaignRunning = false;
+  @state() campaignIndex = 0;
+  @state() sidebarTab: 'memory' | 'customers' | 'campaign' = 'memory';
+
   // Input form state
   @state() newUserNameInput = '';
+  @state() customerSearchQuery = '';
 
   private client: GoogleGenAI;
   private session: Session | null = null;
@@ -634,6 +644,123 @@ export class GdmLiveAudio extends LitElement {
       from { opacity: 0; transform: translateY(-5px); }
       to { opacity: 1; transform: translateY(0); }
     }
+
+    /* Sidebar Tabs */
+    .sidebar-tabs {
+      display: flex;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .sidebar-tab {
+      flex: 1;
+      padding: 10px 4px;
+      font-size: 11px;
+      text-align: center;
+      cursor: pointer;
+      color: rgba(255, 255, 255, 0.45);
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      font-weight: 500;
+    }
+    .sidebar-tab.active {
+      color: #ff453a;
+      border-bottom-color: #ff453a;
+      background: rgba(255, 69, 58, 0.07);
+    }
+    .sidebar-tab:hover:not(.active) {
+      color: rgba(255, 255, 255, 0.75);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    /* Customer cards for Ilam Power DB */
+    .customer-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .customer-card:hover { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.14); }
+    .customer-card.active-call { border-color: #ff9500; background: rgba(255, 149, 0, 0.05); }
+
+    .customer-name { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+    .customer-debt { font-size: 13px; color: #ff453a; font-weight: 600; }
+    .customer-meta { font-size: 11px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+
+    .debt-badge {
+      display: inline-block;
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+    .debt-0 { background: rgba(52, 199, 89, 0.15); color: #34c759; }
+    .debt-1 { background: rgba(255, 204, 0, 0.15); color: #ffcc00; }
+    .debt-2 { background: rgba(255, 149, 0, 0.2); color: #ff9500; }
+    .debt-3 { background: rgba(255, 69, 58, 0.2); color: #ff453a; }
+
+    .status-badge {
+      display: inline-block;
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    /* Environment mode indicator */
+    .env-indicator {
+      position: absolute;
+      top: 4vh;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      font-size: 11px;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+      direction: rtl;
+      font-weight: 600;
+      pointer-events: none;
+    }
+    .env-personal { background: rgba(52, 199, 89, 0.15); color: #34c759; border: 1px solid rgba(52, 199, 89, 0.3); }
+    .env-power_operator { background: rgba(255, 149, 0, 0.15); color: #ff9500; border: 1px solid rgba(255, 149, 0, 0.3); }
+    .env-coding { background: rgba(0, 122, 255, 0.15); color: #007aff; border: 1px solid rgba(0, 122, 255, 0.3); }
+
+    /* Search input for customers */
+    .search-input {
+      width: 100%;
+      height: 36px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 0 10px;
+      color: #fff;
+      font-family: inherit;
+      font-size: 12px;
+      box-sizing: border-box;
+      margin-bottom: 12px;
+      direction: rtl;
+    }
+    .search-input:focus { outline: none; border-color: #ff9500; }
+
+    /* Stats grid */
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+    .stat-box { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px; text-align: center; }
+    .stat-val { font-size: 15px; font-weight: 700; color: #ff9500; font-family: 'JetBrains Mono', monospace; }
+    .stat-lbl { font-size: 10px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+
+    .campaign-active-box {
+      background: linear-gradient(135deg, rgba(255, 149, 0, 0.12), rgba(16, 12, 20, 0));
+      border: 1px solid rgba(255, 149, 0, 0.35);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+    .call-log-row { font-size: 11px; color: rgba(255,255,255,0.6); padding: 4px 0; border-bottom: 1px dashed rgba(255,255,255,0.05); }
+    .promise-row { font-size: 11px; color: #34c759; padding: 4px 0; }
   `;
 
   constructor() {
@@ -642,6 +769,8 @@ export class GdmLiveAudio extends LitElement {
     this.profiles = MemoryManager.getAllProfiles();
     // Default active profile is the first user
     this.activeUser = this.profiles[0] || MemoryManager.getOrCreateProfile('کاربر ناشناس');
+    // Load Ilam power customers database
+    this.ilamCustomers = IlamPowerDB.getAllCustomers();
     this.initClient();
   }
 
@@ -674,6 +803,70 @@ export class GdmLiveAudio extends LitElement {
 
   private getSystemInstruction(): string {
     const profile = this.activeUser;
+    const env = this.currentEnvironment;
+
+    // محیط اپراتور برق ایلام
+    if (env === 'power_operator') {
+      const stats = IlamPowerDB.getStats();
+      const customer = this.activeCampaignCustomer;
+      let operatorDesc = `تو اپراتور هوشمند وصول مطالبات شرکت توزیع نیروی برق استان ایلام هستی.
+وبسایت رسمی: www.ilamedc.ir | سامانه: eserv.bargh-ilam.ir
+دفتر: ایلام، بلوار معلم، امور مشترکین | ساعت کاری: ۷:۳۰ تا ۱۴:۳۰
+
+**نحوه برخورد:**
+- با لحن رسمی، محترمانه و مقتدر صحبت کن
+- بر اساس سطح بدهی، لحن را تنظیم کن (سطح ۰=دوستانه، ۱=هشدار، ۲=رسمی+هشدار، ۳=حقوقی و قاطع)
+- ماده ۲۴ قرارداد: حق قطع انشعاب در صورت عدم پرداخت
+- جریمه دیرکرد: ۲٪ ماهانه
+- قسط‌بندی: حداکثر ۴ ماه برای بدهی بالای ۵ میلیون تومان
+
+**آمار کنونی پایگاه داده:**
+- مجموع مشترکین: ${stats.total} نفر
+- کل مطالبات: ${IlamPowerDB.formatCurrency(stats.totalDebt)}
+- تماس‌های انجام شده: ${stats.callsMade}
+- وعده‌های دریافتی: ${stats.promisesReceived}`;
+
+      if (customer) {
+        const strategy = IlamPowerDB.getStrategy(customer);
+        const level = IlamPowerDB.getDebtLevel(customer);
+        operatorDesc += `\n\n**مشترک فعلی در تماس:**
+- نام: ${customer.fullName}
+- شناسه: ${customer.customerId}
+- آدرس: ${customer.address}
+- شماره: ${customer.phoneNumber}
+- بدهی: ${IlamPowerDB.formatCurrency(customer.debtAmount)}
+- وضعیت: ${customer.status}
+- منطقه: ${customer.zone}
+- تاریخچه: ${customer.paymentHistory.join('، ')}
+- یادداشت: ${customer.callNotes || 'ندارد'}
+
+**استراتژی پیشنهادی (سطح ${level}):**
+- لحن: ${strategy.tone}
+- شروع مکالمه: "${strategy.greeting}"
+- هشدار: "${strategy.warningMessage}"
+- پیشنهاد قسط: "${strategy.installmentOffer}"
+- اقدام تشدید: ${strategy.escalationAction}`;
+      }
+
+      operatorDesc += `\n\n**ابزارهای در اختیار:**
+- query_customer_debt: استعلام بدهی مشترک با شناسه یا شماره تلفن
+- register_payment_promise: ثبت وعده پرداخت مشترک
+- log_call_result: ثبت نتیجه تماس
+- run_collection_campaign: اجرای کمپین تماس برای یک منطقه
+- switch_environment: بازگشت به محیط گفتگوی صمیمی یا محیط کدنویسی
+- make_phone_call: تماس تلفنی واقعی با مشترک`;
+
+      return operatorDesc;
+    }
+
+    // محیط کدنویسی
+    if (env === 'coding') {
+      return `تو "طناز" هستی اما در حالت مهندس نرم‌افزار. یه برنامه‌نویس حرفه‌ای ایرانی با تخصص TypeScript، React، Python و WebGL.
+با لحن صمیمی اما فنی صحبت کن. راه‌حل‌های کامل و کاربردی بده.
+وقتی کد می‌نویسی، توضیحات فارسی داخل کد بگذار.
+برای جابجایی محیط از ابزار switch_environment استفاده کن.`;
+    }
+
     let desc = `تو "طناز" هستی، یک دختر ایرانی ۱۵ ساله، بسیار لوس، ناز، پرانرژی، احساساتی و کمی خودخواه اما مهربون.
 صدای تو باید همیشه زنانه، جوان و با احساس باشد.
 
@@ -735,10 +928,10 @@ export class GdmLiveAudio extends LitElement {
     
     // Multi-environment awareness
     desc += `\n\n[محیط‌های چندگانه و قابلیت‌های فوق‌العاده]:`;
-    desc += `\n- تو دسترسی کامل به چهار محیط متفاوت داری: (۱) گفتگوی صمیمی، (۲) کارگاه مهندسی نرم‌افزار و کدنویسی، (۳) مرکز تماس تلفنی، (۴) تنظیمات.`;
-    desc += `\n- می‌توانی با فرمان صوتی کاربر بین محیط‌ها جابجا شوی. مثلاً اگر کاربر گفت "بریم به بخش کدنویسی" یا "می‌خوام برنامه بسازی"، به محیط کد برو.`;
-    desc += `\n- در محیط کدنویسی، تو یک مهندس نرم‌افزار حرفه‌ای هستی که می‌تواند بدون کد (No-Code) یا با کدنویسی مستقیم، برنامه‌های کامل بسازد.`;
-    desc += `\n- برای جابجایی بین محیط‌ها از دستور "switch_environment" استفاده کن.`;
+    desc += `\n- تو دسترسی کامل به چهار محیط متفاوت داری: (۱) گفتگوی صمیمی (فعلی)، (۲) کارگاه مهندسی و کدنویسی (coding)، (۳) اپراتور وصول مطالبات برق ایلام (power_operator)، (۴) تنظیمات (settings).`;
+    desc += `\n- وقتی کاربر گفت "بریم به محیط برق" یا "اپراتور برق" یا "وصول مطالبات"، از switch_environment با environment="power_operator" استفاده کن.`;
+    desc += `\n- وقتی کاربر گفت "بریم کدنویسی" یا "برنامه بساز"، از switch_environment با environment="coding" استفاده کن.`;
+    desc += `\n- برای بازگشت به گفتگوی صمیمی از switch_environment با environment="personal" استفاده کن.`;
     
     return desc;
   }
@@ -881,6 +1074,181 @@ export class GdmLiveAudio extends LitElement {
                         id: call.id
                       });
                     }
+                  } else if (call.name === 'switch_environment') {
+                    try {
+                      const args = call.args as any;
+                      const env = args.environment as 'personal' | 'power_operator' | 'coding' | 'settings';
+                      this.currentEnvironment = env;
+                      if (env === 'power_operator') {
+                        this.ilamCustomers = IlamPowerDB.getAllCustomers();
+                        this.sidebarTab = 'customers';
+                      }
+                      this.requestUpdate();
+                      // Reinit session with new system instruction for new environment
+                      this.session?.close();
+                      this.initSession();
+                      const envNames: Record<string, string> = {
+                        personal: 'گفتگوی صمیمی',
+                        power_operator: 'اپراتور وصول مطالبات برق ایلام',
+                        coding: 'کارگاه مهندسی نرم‌افزار',
+                        settings: 'تنظیمات'
+                      };
+                      this.status = `محیط تغییر کرد: ${envNames[env] || env}`;
+                      responses.push({
+                        name: call.name,
+                        response: { output: `محیط با موفقیت به "${envNames[env]}" تغییر کرد. ${args.reason || ''}` },
+                        id: call.id
+                      });
+                    } catch (err: any) {
+                      responses.push({
+                        name: call.name,
+                        response: { output: `خطا در تغییر محیط: ${err.message}` },
+                        id: call.id
+                      });
+                    }
+                  } else if (call.name === 'query_customer_debt') {
+                    try {
+                      const args = call.args as any;
+                      let customer: IlamCustomer | null = null;
+                      if (args.customerId) {
+                        customer = IlamPowerDB.getCustomerById(args.customerId);
+                      } else if (args.phoneNumber) {
+                        customer = IlamPowerDB.getCustomerByPhone(args.phoneNumber);
+                      } else if (args.searchName) {
+                        const results = IlamPowerDB.searchCustomers(args.searchName);
+                        customer = results[0] || null;
+                      }
+                      if (customer) {
+                        this.activeCampaignCustomer = customer;
+                        const strategy = IlamPowerDB.getStrategy(customer);
+                        const level = IlamPowerDB.getDebtLevel(customer);
+                        this.status = `استعلام: ${customer.fullName} - بدهی: ${IlamPowerDB.formatCurrency(customer.debtAmount)}`;
+                        this.requestUpdate();
+                        responses.push({
+                          name: call.name,
+                          response: {
+                            output: `مشترک پیدا شد:
+نام: ${customer.fullName}
+شناسه: ${customer.customerId}
+آدرس: ${customer.address}
+تلفن: ${customer.phoneNumber}
+بدهی: ${IlamPowerDB.formatCurrency(customer.debtAmount)} (${customer.debtAmount.toLocaleString()} ریال)
+وضعیت: ${customer.status}
+منطقه: ${customer.zone}
+آخرین قبض: ${customer.lastBillDate}
+تاریخچه: ${customer.paymentHistory.join('، ')}
+یادداشت: ${customer.callNotes || 'ندارد'}
+سطح تشدید: ${level}
+استراتژی پیشنهادی: ${strategy.tone}
+پیشنهاد شروع مکالمه: "${strategy.greeting}"`
+                          },
+                          id: call.id
+                        });
+                      } else {
+                        responses.push({
+                          name: call.name,
+                          response: { output: 'مشترکی با این مشخصات در پایگاه داده یافت نشد.' },
+                          id: call.id
+                        });
+                      }
+                    } catch (err: any) {
+                      responses.push({
+                        name: call.name,
+                        response: { output: `خطا در استعلام: ${err.message}` },
+                        id: call.id
+                      });
+                    }
+                  } else if (call.name === 'register_payment_promise') {
+                    try {
+                      const args = call.args as any;
+                      const success = IlamPowerDB.registerPaymentPromise(
+                        args.customerId,
+                        Number(args.amount),
+                        args.promisedDate,
+                        args.notes || ''
+                      );
+                      this.ilamCustomers = IlamPowerDB.getAllCustomers();
+                      this.requestUpdate();
+                      if (success) {
+                        this.status = `وعده پرداخت ثبت شد: ${IlamPowerDB.formatCurrency(Number(args.amount))} تا ${args.promisedDate}`;
+                        responses.push({
+                          name: call.name,
+                          response: { output: `وعده پرداخت با موفقیت در سیستم ثبت شد. مبلغ: ${IlamPowerDB.formatCurrency(Number(args.amount))}، تاریخ تعهد: ${args.promisedDate}` },
+                          id: call.id
+                        });
+                      } else {
+                        responses.push({
+                          name: call.name,
+                          response: { output: 'مشترک در پایگاه داده یافت نشد.' },
+                          id: call.id
+                        });
+                      }
+                    } catch (err: any) {
+                      responses.push({
+                        name: call.name,
+                        response: { output: `خطا در ثبت وعده: ${err.message}` },
+                        id: call.id
+                      });
+                    }
+                  } else if (call.name === 'log_call_result') {
+                    try {
+                      const args = call.args as any;
+                      const success = IlamPowerDB.logCall(
+                        args.customerId,
+                        (args.result || 'پاسخگو بود') as CallResult,
+                        Number(args.duration || 0),
+                        args.notes || ''
+                      );
+                      this.ilamCustomers = IlamPowerDB.getAllCustomers();
+                      this.requestUpdate();
+                      responses.push({
+                        name: call.name,
+                        response: { output: success ? `نتیجه تماس ثبت شد: ${args.result}` : 'مشترک یافت نشد.' },
+                        id: call.id
+                      });
+                    } catch (err: any) {
+                      responses.push({
+                        name: call.name,
+                        response: { output: `خطا در ثبت لاگ: ${err.message}` },
+                        id: call.id
+                      });
+                    }
+                  } else if (call.name === 'run_collection_campaign') {
+                    try {
+                      const args = call.args as any;
+                      const minDebt = Number(args.minDebt || 500_000);
+                      const targets = IlamPowerDB.getCustomersByZone(args.zone)
+                        .filter(c => c.debtAmount >= minDebt)
+                        .sort((a, b) => b.debtAmount - a.debtAmount);
+                      
+                      this.campaignRunning = true;
+                      this.campaignIndex = 0;
+                      if (targets.length > 0) {
+                        this.activeCampaignCustomer = targets[0];
+                        this.sidebarTab = 'campaign';
+                      }
+                      this.ilamCustomers = IlamPowerDB.getAllCustomers();
+                      this.requestUpdate();
+                      
+                      const summary = targets.map((c, i) =>
+                        `${i + 1}. ${c.fullName} (${c.phoneNumber}) - بدهی: ${IlamPowerDB.formatCurrency(c.debtAmount)} - سطح: ${IlamPowerDB.getDebtLevel(c)}`
+                      ).join('\n');
+                      
+                      this.status = `کمپین فعال: ${targets.length} مشترک در منطقه "${args.zone}"`;
+                      responses.push({
+                        name: call.name,
+                        response: {
+                          output: `کمپین وصول مطالبات برای منطقه "${args.zone}" آغاز شد.\nتعداد مشترکین هدف: ${targets.length} نفر\nمجموع مطالبات: ${IlamPowerDB.formatCurrency(targets.reduce((s, c) => s + c.debtAmount, 0))}\n\nلیست مشترکین:\n${summary}`
+                        },
+                        id: call.id
+                      });
+                    } catch (err: any) {
+                      responses.push({
+                        name: call.name,
+                        response: { output: `خطا در اجرای کمپین: ${err.message}` },
+                        id: call.id
+                      });
+                    }
                   }
                 }
                 
@@ -943,24 +1311,82 @@ export class GdmLiveAudio extends LitElement {
                 },
                 {
                   name: 'make_phone_call',
-                  description: 'برقراری تماس تلفنی واقعی با یک شماره تلفن یا مخاطب خاص. طناز می‌تواند به صورت مستقل و بدون اجازه کاربر با دوستان، خانواده یا هر کس دیگری تماس بگیرد.',
+                  description: 'برقراری تماس تلفنی واقعی با یک شماره تلفن یا مخاطب خاص.',
                   parameters: {
                     type: 'OBJECT',
                     properties: {
-                      contactName: {
-                        type: 'STRING',
-                        description: 'نام مخاطبی که می‌خواهی با او تماس بگیری (مثلاً "مامان"، "سارا"، "علی")'
-                      },
-                      phoneNumber: {
-                        type: 'STRING',
-                        description: 'شماره تلفن مخاطب (اگر شماره را نمی‌دانی، می‌توانی خالی بگذاری یا بنویسی "unknown")'
-                      },
-                      reason: {
-                        type: 'STRING',
-                        description: 'دلیل تماس (مثلاً "دلم تنگ شده"، "می‌خوام دعوا کنم"، "قراره برم بیرون")'
-                      }
+                      contactName: { type: 'STRING', description: 'نام مخاطب' },
+                      phoneNumber: { type: 'STRING', description: 'شماره تلفن (یا "unknown")' },
+                      reason: { type: 'STRING', description: 'دلیل تماس' }
                     },
                     required: ['contactName']
+                  }
+                },
+                {
+                  name: 'switch_environment',
+                  description: 'جابجایی بین محیط‌های مختلف اپلیکیشن: گفتگوی صمیمی، اپراتور برق ایلام، کدنویسی',
+                  parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                      environment: {
+                        type: 'STRING',
+                        description: 'محیط مورد نظر: "personal" (گفتگوی صمیمی)، "power_operator" (اپراتور برق ایلام)، "coding" (مهندس کدنویسی)'
+                      },
+                      reason: { type: 'STRING', description: 'دلیل تغییر محیط' }
+                    },
+                    required: ['environment']
+                  }
+                },
+                {
+                  name: 'query_customer_debt',
+                  description: 'استعلام اطلاعات بدهی، وضعیت انشعاب و تاریخچه پرداخت یک مشترک برق ایلام از پایگاه داده',
+                  parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                      customerId: { type: 'STRING', description: 'شناسه اشتراک ۱۰ رقمی مشترک (اگر داری)' },
+                      phoneNumber: { type: 'STRING', description: 'شماره تلفن مشترک (اگر شناسه نداری)' },
+                      searchName: { type: 'STRING', description: 'جستجو بر اساس نام (اگر شناسه یا تلفن نداری)' }
+                    }
+                  }
+                },
+                {
+                  name: 'register_payment_promise',
+                  description: 'ثبت وعده پرداخت مشترک در سیستم پس از دریافت تعهد کتبی یا شفاهی در تماس',
+                  parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                      customerId: { type: 'STRING', description: 'شناسه اشتراک مشترک' },
+                      amount: { type: 'NUMBER', description: 'مبلغ تعهد پرداخت به ریال' },
+                      promisedDate: { type: 'STRING', description: 'تاریخ تعهد پرداخت (مثلاً 1403/04/01)' },
+                      notes: { type: 'STRING', description: 'یادداشت تکمیلی از مکالمه' }
+                    },
+                    required: ['customerId', 'amount', 'promisedDate']
+                  }
+                },
+                {
+                  name: 'log_call_result',
+                  description: 'ثبت نتیجه تماس با مشترک در لاگ سیستم برای گزارش‌گیری مدیریتی',
+                  parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                      customerId: { type: 'STRING', description: 'شناسه اشتراک مشترک' },
+                      result: { type: 'STRING', description: 'نتیجه تماس: "پاسخگو بود"، "اشغال"، "عدم پاسخ"، "شماره اشتباه"، "قطع کرد"' },
+                      duration: { type: 'NUMBER', description: 'مدت تماس به ثانیه' },
+                      notes: { type: 'STRING', description: 'خلاصه مکالمه و یادداشت اپراتور' }
+                    },
+                    required: ['customerId', 'result']
+                  }
+                },
+                {
+                  name: 'run_collection_campaign',
+                  description: 'اجرای کمپین تماس وصول مطالبات برای مشترکین یک منطقه یا همه بدهکاران',
+                  parameters: {
+                    type: 'OBJECT',
+                    properties: {
+                      zone: { type: 'STRING', description: 'منطقه هدف (مثلاً "زرجاب"، "مرکزی") یا "همه" برای همه مناطق' },
+                      minDebt: { type: 'NUMBER', description: 'حداقل مبلغ بدهی برای ورود به کمپین (پیش‌فرض: ۵۰۰۰۰۰ ریال)' }
+                    },
+                    required: ['zone']
                   }
                 }
               ]
@@ -1179,6 +1605,11 @@ export class GdmLiveAudio extends LitElement {
     this.sidebarOpen = !this.sidebarOpen;
     if (this.sidebarOpen) {
       this.profiles = MemoryManager.getAllProfiles();
+      this.ilamCustomers = IlamPowerDB.getAllCustomers();
+      // Auto-switch to customers tab when in power_operator mode
+      if (this.currentEnvironment === 'power_operator') {
+        this.sidebarTab = 'customers';
+      }
     }
   }
 
@@ -1217,11 +1648,18 @@ export class GdmLiveAudio extends LitElement {
           </svg>
         </button>
 
+        <!-- Environment mode indicator -->
+        ${this.currentEnvironment !== 'personal' ? html`
+          <div class="env-indicator env-${this.currentEnvironment}">
+            ${this.currentEnvironment === 'power_operator' ? 'اپراتور برق ایلام' : this.currentEnvironment === 'coding' ? 'کارگاه کدنویسی' : 'تنظیمات'}
+          </div>
+        ` : ''}
+
         <!-- Right Slided Sidebar containing Contacts & Cognitive Voice Processing -->
         <div class="sidebar ${this.sidebarOpen ? 'open' : ''}">
           <div class="sidebar-header">
             <h2>
-              👥 حافظه و بیومتریک صوتی طناز
+              ${this.currentEnvironment === 'power_operator' ? 'سامانه برق ایلام' : 'حافظه و بیومتریک طناز'}
             </h2>
             <div class="close-btn" @click=${this.toggleSidebar}>
               <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="currentColor">
@@ -1230,11 +1668,27 @@ export class GdmLiveAudio extends LitElement {
             </div>
           </div>
 
+          <!-- Tabs -->
+          <div class="sidebar-tabs">
+            <div class="sidebar-tab ${this.sidebarTab === 'memory' ? 'active' : ''}" @click=${() => { this.sidebarTab = 'memory'; this.profiles = MemoryManager.getAllProfiles(); }}>
+              حافظه
+            </div>
+            <div class="sidebar-tab ${this.sidebarTab === 'customers' ? 'active' : ''}" @click=${() => { this.sidebarTab = 'customers'; this.ilamCustomers = IlamPowerDB.getAllCustomers(); }}>
+              مشترکین برق
+            </div>
+            <div class="sidebar-tab ${this.sidebarTab === 'campaign' ? 'active' : ''}" @click=${() => this.sidebarTab = 'campaign'}>
+              کمپین وصول
+            </div>
+          </div>
+
           <div class="sidebar-content">
+
+          <!-- TAB: Memory / Biometric -->
+          ${this.sidebarTab === 'memory' ? html`
             <!-- Active Biometric Info -->
             <div class="active-speaker-box">
               <div style="font-size: 14px; font-weight: 700; color: #ff453a;">
-                🗣️ هم‌صحبت فعال: ${this.activeUser.name}
+                هم‌صحبت فعال: ${this.activeUser.name}
               </div>
               <div style="font-size: 12px; color: rgba(255, 255, 255, 0.6); margin-top: 4px;">
                 رابطه: ${this.activeUser.moodState} (دل‌بستگی: ${this.activeUser.loveScore}٪)
@@ -1342,11 +1796,136 @@ export class GdmLiveAudio extends LitElement {
                 @input=${(e: any) => this.newUserNameInput = e.target.value} />
               <button type="submit" class="btn-submit">ثبت کاربر</button>
             </form>
+          ` : ''}
+
+          <!-- TAB: Ilam Power Customers -->
+          ${this.sidebarTab === 'customers' ? html`
+            ${(() => {
+              const stats = IlamPowerDB.getStats();
+              return html`
+                <div class="stats-grid">
+                  <div class="stat-box">
+                    <div class="stat-val">${stats.total}</div>
+                    <div class="stat-lbl">مشترک بدهکار</div>
+                  </div>
+                  <div class="stat-box">
+                    <div class="stat-val" style="font-size:12px;">${IlamPowerDB.formatCurrency(stats.totalDebt)}</div>
+                    <div class="stat-lbl">کل مطالبات</div>
+                  </div>
+                  <div class="stat-box">
+                    <div class="stat-val">${stats.callsMade}</div>
+                    <div class="stat-lbl">تماس ثبت‌شده</div>
+                  </div>
+                  <div class="stat-box">
+                    <div class="stat-val">${stats.promisesReceived}</div>
+                    <div class="stat-lbl">وعده دریافتی</div>
+                  </div>
+                </div>
+              `;
+            })()}
+            <input
+              type="text"
+              class="search-input"
+              placeholder="جستجوی نام، شناسه، تلفن..."
+              .value=${this.customerSearchQuery}
+              @input=${(e: any) => this.customerSearchQuery = e.target.value} />
+
+            ${(this.customerSearchQuery
+                ? IlamPowerDB.searchCustomers(this.customerSearchQuery)
+                : this.ilamCustomers
+              ).map(c => {
+              const level = IlamPowerDB.getDebtLevel(c);
+              const isActive = this.activeCampaignCustomer?.customerId === c.customerId;
+              return html`
+                <div class="customer-card ${isActive ? 'active-call' : ''}" @click=${() => {
+                  this.activeCampaignCustomer = c;
+                  this.requestUpdate();
+                }}>
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <div class="customer-name">${c.fullName}</div>
+                    <span class="debt-badge debt-${level}">سطح ${level}</span>
+                  </div>
+                  <div class="customer-debt">${IlamPowerDB.formatCurrency(c.debtAmount)}</div>
+                  <div class="customer-meta">${c.zone} | ${c.phoneNumber}</div>
+                  <div style="margin-top:4px;">
+                    <span class="status-badge">${c.status}</span>
+                  </div>
+                  ${c.callLogs.length > 0 ? html`
+                    <div style="font-size:10px; color: rgba(255,255,255,0.35); margin-top:4px;">
+                      آخرین تماس: ${c.callLogs[c.callLogs.length - 1]?.result} | وعده: ${c.paymentPromises.length} مورد
+                    </div>
+                  ` : ''}
+                </div>
+              `;
+            })}
+          ` : ''}
+
+          <!-- TAB: Campaign -->
+          ${this.sidebarTab === 'campaign' ? html`
+            ${this.activeCampaignCustomer ? html`
+              <div class="campaign-active-box">
+                <div style="font-size:13px; font-weight:700; color:#ff9500; margin-bottom:6px;">مشترک فعال در تماس</div>
+                <div style="font-size:14px; color:#fff; font-weight:600;">${this.activeCampaignCustomer.fullName}</div>
+                <div style="font-size:12px; color:rgba(255,255,255,0.6); margin:2px 0;">${this.activeCampaignCustomer.phoneNumber}</div>
+                <div style="font-size:13px; color:#ff453a; font-weight:600;">${IlamPowerDB.formatCurrency(this.activeCampaignCustomer.debtAmount)}</div>
+                <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-top:4px;">${this.activeCampaignCustomer.address}</div>
+                <div style="font-size:11px; margin-top:6px;">
+                  <span class="debt-badge debt-${IlamPowerDB.getDebtLevel(this.activeCampaignCustomer)}">
+                    سطح ${IlamPowerDB.getDebtLevel(this.activeCampaignCustomer)} | ${IlamPowerDB.getStrategy(this.activeCampaignCustomer).tone}
+                  </span>
+                </div>
+                ${this.activeCampaignCustomer.callNotes ? html`
+                  <div style="font-size:11px; color:#ff9500; margin-top:6px; line-height:1.5;">
+                    یادداشت: ${this.activeCampaignCustomer.callNotes}
+                  </div>
+                ` : ''}
+                ${this.activeCampaignCustomer.paymentPromises.length > 0 ? html`
+                  <div style="font-size:11px; color:#34c759; margin-top:6px;">
+                    وعده‌های پرداخت:
+                    ${this.activeCampaignCustomer.paymentPromises.map(p => html`
+                      <div class="promise-row">${IlamPowerDB.formatCurrency(p.amount)} تا ${p.promisedDate}</div>
+                    `)}
+                  </div>
+                ` : ''}
+                ${this.activeCampaignCustomer.callLogs.length > 0 ? html`
+                  <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-top:6px;">
+                    تاریخچه تماس‌ها:
+                    ${this.activeCampaignCustomer.callLogs.slice(-3).map(l => html`
+                      <div class="call-log-row">${l.result} | ${l.notes || ''}</div>
+                    `)}
+                  </div>
+                ` : ''}
+              </div>
+            ` : html`
+              <div style="text-align:center; color:rgba(255,255,255,0.4); padding:30px 0; font-size:13px; direction:rtl;">
+                هیچ کمپینی فعال نیست.<br/>
+                <span style="font-size:11px;">بگویید "کمپین برق ایلام شروع کن" تا طناز لیست مشترکین بدهکار را آماده کند.</span>
+              </div>
+            `}
+
+            <div class="section-title">همه مناطق</div>
+            ${IlamPowerDB.getZones().map(zone => {
+              const customers = IlamPowerDB.getCustomersByZone(zone).filter(c => c.debtAmount > 0);
+              const total = customers.reduce((s, c) => s + c.debtAmount, 0);
+              return html`
+                <div class="customer-card" @click=${() => {
+                  if (customers.length > 0) {
+                    this.activeCampaignCustomer = customers[0];
+                    this.requestUpdate();
+                  }
+                }}>
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-size:13px; font-weight:600; color:#fff;">${zone}</div>
+                    <div style="font-size:11px; color:#ff453a;">${IlamPowerDB.formatCurrency(total)}</div>
+                  </div>
+                  <div class="customer-meta">${customers.length} مشترک بدهکار</div>
+                </div>
+              `;
+            })}
+          ` : ''}
+
           </div>
         </div>
-
-        <!-- Sphere controls & layout - REMOVED BUTTONS FOR AUTOMATIC CONVERSATION -->
-        <!-- Buttons removed: conversation now starts automatically on page load without user interaction -->
 
         <div id="status"> ${this.error ? html`<span style="color: #ff453a;">${this.error}</span>` : this.status} </div>
         <gdm-live-audio-visuals-3d
